@@ -70,7 +70,7 @@ npm run dev
 ## Связанные проекты
 
 - [saucedemo-playwright](https://github.com/Skr1leXX/saucedemo-playwright) — UI-автотесты на Playwright (портфолио автоматизации тестирования)
-- 
+  
 ## Автор
 
 Лапин Егор Антонович
