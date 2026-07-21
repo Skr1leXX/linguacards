@@ -3,13 +3,13 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 
-// Регистрация
+router.post('/send-code', authController.sendCode);
 router.post('/register', authController.register);
-
-// Вход
 router.post('/login', authController.login);
-
-// Получение профиля (защищенный маршрут)
 router.get('/profile', authMiddleware, authController.getProfile);
+
+// Сброс пароля
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 module.exports = router;

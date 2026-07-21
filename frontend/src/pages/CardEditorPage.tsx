@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 import { 
   Save, ArrowLeft, Plus, Trash2, Copy, 
   Volume2, Image, Link, Hash,
@@ -14,6 +15,7 @@ import type { Card } from '../types';
 const CardEditorPage = () => {
   const { id: deckId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
   
   const [cards, setCards] = useState<Card[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
@@ -92,7 +94,7 @@ const CardEditorPage = () => {
       } else {
         // Создание новой карточки
         await createCard(editingCard);
-        setSuccess('Карточка создана');
+        toast.success('Карточка создана!');
         setCurrentCardIndex(0); // Перейти к первой карточке
       }
       
@@ -117,7 +119,7 @@ const CardEditorPage = () => {
           example: '',
         });
       }
-      setSuccess('Карточка удалена');
+      toast.success('Карточка удалена');
       setTimeout(() => setSuccess(null), 2000);
     } catch (err: any) {
       setError(err.message || 'Ошибка при удалении карточки');
@@ -144,7 +146,7 @@ const CardEditorPage = () => {
     };
     
     setEditingCard(duplicatedCard);
-    setSuccess('Карточка скопирована для редактирования');
+    toast.info('Карточка скопирована для редактирования');
     setTimeout(() => setSuccess(null), 2000);
   };
 

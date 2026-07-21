@@ -9,7 +9,7 @@ const LoginPage = () => {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -28,15 +28,12 @@ const LoginPage = () => {
     setError('');
 
     try {
-      // Отправляем запрос на бэкенд
       const response = await api.post('/auth/login', formData);
-      
+
       if (response.data.token && response.data.user) {
-        // Используем функцию login из useAuth
         const result = await login(response.data.token, response.data.user);
-        
+
         if (result.success) {
-          // Успешный вход - редирект на главную
           navigate('/');
         } else {
           setError(result.error || 'Ошибка при сохранении данных входа');
@@ -47,21 +44,13 @@ const LoginPage = () => {
     } catch (err: any) {
       console.error('Ошибка входа:', err);
       setError(
-        err.response?.data?.error || 
-        err.response?.data?.message || 
+        err.response?.data?.error ||
+        err.response?.data?.message ||
         'Ошибка при входе. Проверьте email и пароль.'
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  // Тестовый вход для быстрой проверки
-  const handleTestLogin = () => {
-    setFormData({
-      email: 'test@example.com',
-      password: 'test123',
-    });
   };
 
   return (
@@ -99,9 +88,7 @@ const LoginPage = () => {
 
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email
-              </label>
+              <label htmlFor="email" className="sr-only">Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
@@ -121,9 +108,7 @@ const LoginPage = () => {
               </div>
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
-                Пароль
-              </label>
+              <label htmlFor="password" className="sr-only">Пароль</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400" />
@@ -142,6 +127,15 @@ const LoginPage = () => {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="flex items-center justify-end">
+            <Link
+              to="/forgot-password"
+              className="text-sm text-primary-600 hover:text-primary-500"
+            >
+              Забыли пароль?
+            </Link>
           </div>
 
           <div>
@@ -169,26 +163,7 @@ const LoginPage = () => {
               )}
             </button>
           </div>
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={handleTestLogin}
-              disabled={loading}
-              className="text-sm text-primary-600 hover:text-primary-500 underline"
-            >
-              Использовать тестовый аккаунт
-            </button>
-          </div>
         </form>
-
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            <strong>Тестовые данные:</strong><br />
-            Email: test@example.com<br />
-            Пароль: test123
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { 
   Search, Filter, Star, Users, Clock, BookOpen, 
   Download, Globe, TrendingUp, Award, CheckCircle,
-  ChevronRight, Sparkles, Tag, Plus, Eye, Lock
+  ChevronRight, Sparkles, Plus, Eye
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { studyAPI } from '../services/api';
+import { useToast } from '../context/ToastContext'; // ← Оставляем studyAPI как было
 import type { PrebuiltDeck, PrebuiltDeckCategory, PrebuiltDeckFilters } from '../types';
 
 const PrebuiltDecksPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [decks, setDecks] = useState<PrebuiltDeck[]>([]);
   const [categories, setCategories] = useState<PrebuiltDeckCategory[]>([]);
   const [languages, setLanguages] = useState<Array<{ code: string; name: string; count: number }>>([]);
@@ -34,86 +36,85 @@ const PrebuiltDecksPage = () => {
       setLoading(true);
       console.log('Fetching prebuilt decks with filters:', filters);
       
+      // Используем старый метод studyAPI.getPrebuiltDecks
       const response = await studyAPI.getPrebuiltDecks(filters);
       console.log('API Response:', response);
-      console.log('Response data:', response.data);
       
-      // Backend возвращает данные напрямую, а не в поле data.data
+      // Старая структура: response.data содержит decks, categories и т.д.
       const responseData = response.data as any;
       
-      console.log('Response data structure:', {
-        hasDecks: !!responseData.decks,
-        decksLength: responseData.decks?.length,
-        hasCategories: !!responseData.categories,
-        hasLanguages: !!responseData.languages,
-        hasDifficulties: !!responseData.difficulties
+      console.log('Response data:', {
+        decks: responseData.decks,
+        categories: responseData.categories,
+        languages: responseData.languages,
+        difficulties: responseData.difficulties
       });
       
-      // Убедимся, что decks есть и это массив
-      if (responseData && Array.isArray(responseData.decks)) {
-        setDecks(responseData.decks as PrebuiltDeck[]);
+      // Проверяем структуру данных
+      if (responseData) {
+        // В старой структуре decks может быть в responseData.decks или responseData.data.decks
+        const decksData = responseData.decks || responseData.data?.decks || [];
+        const categoriesData = responseData.categories || responseData.data?.categories || [];
+        const languagesData = responseData.languages || responseData.data?.languages || [];
+        const difficultiesData = responseData.difficulties || responseData.data?.difficulties || [];
+        
+        setDecks(Array.isArray(decksData) ? decksData : []);
+        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        setLanguages(Array.isArray(languagesData) ? languagesData : []);
+        setDifficulties(Array.isArray(difficultiesData) ? difficultiesData : []);
       } else {
-        console.warn('No decks array found in response:', responseData);
         setDecks([]);
+        setCategories([]);
+        setLanguages([]);
+        setDifficulties([]);
       }
-      
-      // Явно приводим типы
-      setCategories((responseData.categories as PrebuiltDeckCategory[]) || []);
-      setLanguages((responseData.languages as Array<{ code: string; name: string; count: number }>) || []);
-      setDifficulties((responseData.difficulties as Array<{ id: string; name: string; count: number }>) || []);
       
     } catch (error: any) {
       console.error('Ошибка загрузки готовых курсов:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config
-      });
       
-      // Fallback данные для разработки
+      // Fallback данные если API не работает
       const fallbackData = {
         decks: [
           {
             id: 1,
-            name: 'Английские основы (fallback)',
+            name: 'Английские глаголы',
             language: 'en',
-            description: 'Тестовые данные для отладки',
-            category: 'basic',
+            description: 'Основные английские глаголы',
+            category: 'verbs',
             difficulty: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
-            card_count: 20,
-            tags: ['тест', 'отладка'],
+            card_count: 50,
+            tags: ['глаголы', 'начальный'],
             is_free: true,
-            author: 'Debug Team',
+            author: 'System',
             created_at: new Date().toISOString(),
             popularity: 85
           },
           {
             id: 2,
-            name: 'Испанские глаголы (fallback)',
+            name: 'Испанские существительные',
             language: 'es',
-            description: 'Базовые испанские глаголы',
-            category: 'grammar',
+            description: 'Базовые испанские существительные',
+            category: 'nouns',
             difficulty: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
-            card_count: 15,
-            tags: ['глаголы', 'начальный'],
+            card_count: 40,
+            tags: ['существительные', 'начальный'],
             is_free: true,
-            author: 'Debug Team',
+            author: 'System',
             created_at: new Date().toISOString(),
             popularity: 75
           }
         ] as PrebuiltDeck[],
         categories: [
-          { id: 'basic', name: 'Основы', deck_count: 1 },
-          { id: 'grammar', name: 'Грамматика', deck_count: 1 }
+          { id: 'verbs', name: 'Глаголы', deck_count: 1 },
+          { id: 'nouns', name: 'Существительные', deck_count: 1 }
         ] as PrebuiltDeckCategory[],
         languages: [
           { code: 'en', name: 'Английский', count: 1 },
           { code: 'es', name: 'Испанский', count: 1 }
-        ] as Array<{ code: string; name: string; count: number }>,
+        ],
         difficulties: [
           { id: 'beginner', name: 'Начинающий', count: 2 }
-        ] as Array<{ id: string; name: string; count: number }>
+        ]
       };
       
       setDecks(fallbackData.decks);
@@ -127,51 +128,41 @@ const PrebuiltDecksPage = () => {
   };
 
   const handleAddDeck = async (deckId: number, deckName: string) => {
-  if (addingDeckId) return;
-  
-  setAddingDeckId(deckId);
-  setSuccessMessage(null);
-  
-  try {
-    console.log('Adding prebuilt deck:', deckId, deckName);
-    console.log('User token:', localStorage.getItem('token'));
+    if (addingDeckId) return;
     
-    const response = await studyAPI.addPrebuiltDeck(deckId, {
-      custom_name: deckName
-    });
+    setAddingDeckId(deckId);
+    setSuccessMessage(null);
     
-    console.log('Add deck response:', response);
-    console.log('Response data:', response.data);
-    console.log('Response status:', response.status);
-    
-    setSuccessMessage(`Курс "${deckName}" успешно добавлен в вашу коллекцию!`);
-    
-    // Обновляем список колод
-    setTimeout(() => {
-      fetchPrebuiltDecks();
-    }, 1000);
-    
-  } catch (error: any) {
-    console.error('Ошибка при добавлении курса:', error);
-    console.error('Error details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      config: error.config
-    });
-    
-    // Более информативное сообщение
-    const errorMessage = error.response?.data?.error || 
-                        error.response?.data?.message || 
-                        error.message || 
-                        'Ошибка при добавлении курса';
-    
-    alert(`Не удалось добавить курс: ${errorMessage}\n\nПроверьте консоль для подробностей.`);
-    
-  } finally {
-    setAddingDeckId(null);
-  }
-};
+    try {
+      console.log('Adding prebuilt deck:', deckId, deckName);
+      
+      // Используем старый метод studyAPI.addPrebuiltDeck
+      const response = await studyAPI.addPrebuiltDeck(deckId, {
+        custom_name: deckName
+      });
+      
+      console.log('Add deck response:', response);
+      
+      setSuccessMessage(`Курс "${deckName}" успешно добавлен в вашу коллекцию!`);
+      
+      // Обновляем список колод
+      setTimeout(() => {
+        fetchPrebuiltDecks();
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error('Ошибка при добавлении курса:', error);
+      
+      const errorMessage = error.response?.data?.error || 
+                          error.message || 
+                          'Ошибка при добавлении курса';
+      
+      toast.error(`Не удалось добавить курс: ${errorMessage}`);
+      
+    } finally {
+      setAddingDeckId(null);
+    }
+  };
 
   const handleFilterChange = (key: keyof PrebuiltDeckFilters, value: string) => {
     setFilters(prev => ({
@@ -214,7 +205,9 @@ const PrebuiltDecksPage = () => {
       'de': 'Немецкий',
       'fr': 'Французский',
       'it': 'Итальянский',
-      'ru': 'Русский'
+      'ru': 'Русский',
+      'ja': 'Японский',
+      'zh': 'Китайский'
     };
     return langMap[code] || code;
   };
@@ -226,7 +219,9 @@ const PrebuiltDecksPage = () => {
       'de': '🇩🇪',
       'fr': '🇫🇷',
       'it': '🇮🇹',
-      'ru': '🇷🇺'
+      'ru': '🇷🇺',
+      'ja': '🇯🇵',
+      'zh': '🇨🇳'
     };
     return flagMap[code] || '🌐';
   };
@@ -261,7 +256,7 @@ const PrebuiltDecksPage = () => {
 
         {/* Сообщение об успехе */}
         {successMessage && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 animate-fadeIn">
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center">
               <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
               <div>
@@ -300,7 +295,7 @@ const PrebuiltDecksPage = () => {
               <option value="">Все категории</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
-                  {cat.name} ({cat.deck_count})
+                  {cat.name} ({cat.deck_count || 0})
                 </option>
               ))}
             </select>
@@ -314,7 +309,7 @@ const PrebuiltDecksPage = () => {
               <option value="">Все языки</option>
               {languages.map(lang => (
                 <option key={lang.code} value={lang.code}>
-                  {getLanguageName(lang.code)} ({lang.count})
+                  {getLanguageName(lang.code)} ({lang.count || 0})
                 </option>
               ))}
             </select>
@@ -328,120 +323,10 @@ const PrebuiltDecksPage = () => {
               <option value="">Любая сложность</option>
               {difficulties.map(diff => (
                 <option key={diff.id} value={diff.id}>
-                  {getDifficultyText(diff.id)} ({diff.count})
+                  {getDifficultyText(diff.id)} ({diff.count || 0})
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Активные фильтры */}
-          {(filters.category || filters.language || filters.difficulty || filters.search) && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Активные фильтры:</span>
-                <div className="flex flex-wrap gap-2">
-                  {filters.category && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-                      Категория: {categories.find(c => c.id === filters.category)?.name || filters.category}
-                      <button
-                        onClick={() => handleFilterChange('category', '')}
-                        className="ml-2 text-blue-600 hover:text-blue-800"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                  {filters.language && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
-                      Язык: {getLanguageName(filters.language)}
-                      <button
-                        onClick={() => handleFilterChange('language', '')}
-                        className="ml-2 text-green-600 hover:text-green-800"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                  {filters.difficulty && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
-                      Сложность: {getDifficultyText(filters.difficulty)}
-                      <button
-                        onClick={() => handleFilterChange('difficulty', '')}
-                        className="ml-2 text-yellow-600 hover:text-yellow-800"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                  {filters.search && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
-                      Поиск: "{filters.search}"
-                      <button
-                        onClick={() => handleFilterChange('search', '')}
-                        className="ml-2 text-purple-600 hover:text-purple-800"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={clearFilters}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Сбросить все
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-800">Всего наборов</p>
-              <p className="text-3xl font-bold text-blue-900">{decks.length}</p>
-            </div>
-            <BookOpen className="h-8 w-8 text-blue-500" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-green-800">Бесплатных</p>
-              <p className="text-3xl font-bold text-green-900">
-                {decks.filter(d => d.is_free).length}
-              </p>
-            </div>
-            <Star className="h-8 w-8 text-green-500" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-purple-800">Карточек всего</p>
-              <p className="text-3xl font-bold text-purple-900">
-                {decks.reduce((sum, deck) => sum + (deck.card_count || 0), 0)}
-              </p>
-            </div>
-            <Tag className="h-8 w-8 text-purple-500" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-orange-800">Языков</p>
-              <p className="text-3xl font-bold text-orange-900">
-                {new Set(decks.map(d => d.language)).size}
-              </p>
-            </div>
-            <Globe className="h-8 w-8 text-orange-500" />
           </div>
         </div>
       </div>
@@ -452,10 +337,6 @@ const PrebuiltDecksPage = () => {
           <h2 className="text-2xl font-bold text-gray-900">
             Доступные наборы ({decks.length})
           </h2>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <TrendingUp className="h-4 w-4" />
-            <span>Сортировка по популярности</span>
-          </div>
         </div>
 
         {decks.length === 0 ? (
@@ -473,8 +354,7 @@ const PrebuiltDecksPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {decks.map(deck => {
-              // Вычисляем популярность на основе ID (заглушка для демо)
-              const popularity = deck.popularity || (70 + (deck.id % 30)); // От 70 до 99%
+              const popularity = deck.popularity || (70 + (deck.id % 30));
               
               return (
                 <div
@@ -490,21 +370,12 @@ const PrebuiltDecksPage = () => {
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(deck.difficulty)}`}>
                             {getDifficultyText(deck.difficulty)}
                           </span>
-                          {deck.is_free ? (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Бесплатно
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Премиум
-                            </span>
-                          )}
+                          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Бесплатно</span>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
                           {deck.name}
                         </h3>
-                        <p className="text-gray-600 text-sm line-clamp-2">
+                        <p className="text-gray-600 text-sm">
                           {deck.description}
                         </p>
                       </div>
@@ -522,33 +393,10 @@ const PrebuiltDecksPage = () => {
                       </div>
                       <div className="text-center p-2 bg-gray-50 rounded-lg">
                         <div className="font-bold text-gray-900">
-                          {new Date(deck.created_at).toLocaleDateString('ru-RU', { month: 'short' })}
+                          {deck.created_at ? new Date(deck.created_at).toLocaleDateString('ru-RU', { month: 'short' }) : 'Готовая'}
                         </div>
                         <div className="text-xs text-gray-600">добавлена</div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Теги и автор */}
-                  <div className="p-4 bg-gray-50 border-b border-gray-100">
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {deck.tags?.slice(0, 3).map((tag, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-white border border-gray-200 rounded text-xs text-gray-700"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {deck.tags && deck.tags.length > 3 && (
-                        <span className="px-2 py-1 text-xs text-gray-500">
-                          +{deck.tags.length - 3}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center text-xs text-gray-500">
-                      <Users className="h-3 w-3 mr-1" />
-                      <span>Автор: {deck.author || 'Spaced Repetition Team'}</span>
                     </div>
                   </div>
 
@@ -557,11 +405,9 @@ const PrebuiltDecksPage = () => {
                     <div className="flex space-x-3">
                       <button
                         onClick={() => handleAddDeck(deck.id, deck.name)}
-                        disabled={!deck.is_free || addingDeckId === deck.id}
+                        disabled={addingDeckId === deck.id}
                         className={`flex-1 flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                          !deck.is_free
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : addingDeckId === deck.id
+                          addingDeckId === deck.id
                             ? 'bg-primary-400 text-white'
                             : 'bg-primary-600 text-white hover:bg-primary-700'
                         }`}
@@ -571,15 +417,10 @@ const PrebuiltDecksPage = () => {
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                             Добавление...
                           </>
-                        ) : !deck.is_free ? (
-                          <>
-                            <Lock className="h-4 w-4 mr-2" />
-                            Премиум
-                          </>
                         ) : (
                           <>
                             <Plus className="h-4 w-4 mr-2" />
-                            Добавить в мои курсы
+                            Добавить
                           </>
                         )}
                       </button>
@@ -599,42 +440,6 @@ const PrebuiltDecksPage = () => {
         )}
       </div>
 
-      {/* Преимущества готовых наборов */}
-      <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl border border-primary-200 p-8">
-        <h2 className="text-2xl font-bold text-primary-900 mb-6 text-center">
-          Почему готовые наборы эффективны?
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg p-6 text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Award className="h-6 w-6 text-blue-600" />
-            </div>
-            <h3 className="font-bold text-gray-900 mb-2">Профессиональный подбор</h3>
-            <p className="text-gray-600 text-sm">
-              Карточки созданы опытными преподавателями с учетом частотности использования слов
-            </p>
-          </div>
-          <div className="bg-white rounded-lg p-6 text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="h-6 w-6 text-green-600" />
-            </div>
-            <h3 className="font-bold text-gray-900 mb-2">Экономия времени</h3>
-            <p className="text-gray-600 text-sm">
-              Не тратьте время на создание карточек - сразу приступайте к изучению
-            </p>
-          </div>
-          <div className="bg-white rounded-lg p-6 text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <TrendingUp className="h-6 w-6 text-purple-600" />
-            </div>
-            <h3 className="font-bold text-gray-900 mb-2">Быстрый прогресс</h3>
-            <p className="text-gray-600 text-sm">
-              Сфокусированные наборы позволяют быстро освоить конкретные темы
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Призыв к действию */}
       <div className="mt-8 text-center">
         <p className="text-gray-600 mb-4">
@@ -642,7 +447,7 @@ const PrebuiltDecksPage = () => {
         </p>
         <Link
           to="/decks/new"
-          className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 font-medium shadow-lg"
+          className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 font-medium"
         >
           <Plus className="h-5 w-5 mr-2" />
           Создать свой курс
@@ -652,35 +457,5 @@ const PrebuiltDecksPage = () => {
     </div>
   );
 };
-
-// Добавим CSS для ограничения строк
-const styles = `
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-`;
-
-// Добавляем стили в документ
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = styles;
-  document.head.appendChild(styleElement);
-}
 
 export default PrebuiltDecksPage;

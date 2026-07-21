@@ -23,21 +23,27 @@ export const useDecks = () => {
     }
   }, []);
 
-  const createDeck = useCallback(async (deckData: any) => {
-    setLoading(true);
-    setError(null);
+const createDeck = useCallback(async (data: any) => {
+  setLoading(true);
+  setError(null);
+  
+  try {
+    console.log('Отправка данных для создания курса:', data);
+    const response = await deckAPI.create(data);
+    console.log('Ответ от сервера:', response.data);
     
-    try {
-      const response = await deckAPI.create(deckData);
-      setDecks(prev => [response.data.deck, ...prev]);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при создании колоды');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    // Сервер возвращает { message: '...', deck: { ... } }
+    const newDeck = response.data.deck || response.data;
+    setDecks(prev => [...prev, newDeck]);
+    return newDeck; // ← Возвращаем только deck, не весь response
+  } catch (err: any) {
+    console.error('Ошибка в useDecks.createDeck:', err);
+    setError(err.message || 'Ошибка при создании курса');
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   const updateDeck = useCallback(async (id: number, deckData: any) => {
     setLoading(true);

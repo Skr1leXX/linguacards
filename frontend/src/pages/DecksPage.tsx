@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, BookOpen, Globe, Calendar, RefreshCw, Lock } from 'lucide-react';
+import { Plus, BookOpen, Globe, Calendar, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDecks } from '../hooks/useDecks';
 import type { Deck } from '../types';
@@ -173,7 +173,7 @@ const DecksPage = () => {
                   </span>
                 </div>
               </div>
-              <div className={`${deck.is_public ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} text-xs font-bold px-3 py-1 rounded-full`}>
+              <div className={`'bg-gray-100 text-gray-600' text-xs font-bold px-3 py-1 rounded-full`}>
                 {deck.card_count || 0} карт.
               </div>
             </div>
@@ -186,17 +186,6 @@ const DecksPage = () => {
               {/* Индикатор публичности */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">
-                  {deck.is_public ? (
-                    <span className="flex items-center text-green-600">
-                      <Globe className="h-4 w-4 mr-1" />
-                      Публичная
-                    </span>
-                  ) : (
-                    <span className="flex items-center text-gray-600">
-                      <Lock className="h-4 w-4 mr-1" />
-                      Приватная
-                    </span>
-                  )}
                 </span>
                 <span className="text-sm font-medium text-primary-600">
                   {deck.due_count || 0} к повторению
@@ -215,11 +204,11 @@ const DecksPage = () => {
                     Учить
                   </Link>
                   <Link 
-                    to={`/decks/${deck.id}`}
-                    className="btn-secondary text-sm px-4"
-                  >
-                    Редактировать
-                  </Link>
+  to={`/decks/${deck.id}`}
+  className="btn-secondary text-sm px-4"
+>
+  Редактировать
+</Link>
                 </div>
               </div>
             </div>
@@ -228,17 +217,17 @@ const DecksPage = () => {
 
         {/* Карточка для создания новой колоды */}
         <Link 
-          to="/decks/new"
-          className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center hover:border-primary-400 hover:bg-primary-50 transition-colors"
-        >
-          <div className="bg-primary-100 p-3 rounded-full mb-4">
-            <Plus className="h-8 w-8 text-primary-600" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Создать новый курс</h3>
-          <p className="text-gray-600 text-center text-sm">
-            Начните изучать новые слова с собственным курсом
-          </p>
-        </Link>
+  to="/decks/new"
+  className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center hover:border-primary-400 hover:bg-primary-50 transition-colors"
+>
+  <div className="bg-primary-100 p-3 rounded-full mb-4">
+    <Plus className="h-8 w-8 text-primary-600" />
+  </div>
+  <h3 className="text-lg font-medium text-gray-900 mb-2">Создать новый курс</h3>
+  <p className="text-gray-600 text-center text-sm">
+    Начните изучать новые слова с собственным курсом
+  </p>
+</Link>
       </div>
 
       {/* Сообщение если нет колод */}

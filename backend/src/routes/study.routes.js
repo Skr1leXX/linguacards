@@ -9,7 +9,6 @@ router.use(authMiddleware);
 
 // Маршруты для изучения
 router.get('/session', studyController.getSessionCards);
-router.get('/stats', studyController.getStudyStats);
 router.post('/import/:deckId', checkOwnership.checkDeckOwnership, studyController.importCards);
 router.get('/export/:deckId', checkOwnership.checkDeckOwnership, studyController.exportCards);
 router.get('/prebuilt-decks', studyController.getPrebuiltDecks);

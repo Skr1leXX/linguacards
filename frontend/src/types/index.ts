@@ -74,9 +74,29 @@ export interface LanguageStat {
 }
 
 export interface StudyStats {
-  overview: StatsOverview;
-  daily_stats: DailyStats[];
-  language_stats: LanguageStat[];
+   overview: {
+    total_cards: number;
+    cards_today: number;
+    accuracy: number;
+    streak_days: number;
+    correct_reviews: number;
+    total_reviews: number;
+    unique_decks: number;
+    unique_cards: number;
+    due_cards: number;
+  };
+  daily_stats: Array<{
+    date: string;
+    total: number;
+    correct: number;
+  }>;
+  language_stats: Array<{
+    language: string;
+    total_cards: number;
+    due_cards: number;
+    total_reviews: number;
+    correct_reviews: number;
+  }>;
 }
 
 export interface SessionCards {
@@ -84,7 +104,6 @@ export interface SessionCards {
   cards: Card[];
 }
 
-// ДОБАВЛЕННЫЕ ТИПЫ ДЛЯ ИМПОРТА/ЭКСПОРТА
 export interface ImportCardData {
   front_text: string;
   back_text: string;

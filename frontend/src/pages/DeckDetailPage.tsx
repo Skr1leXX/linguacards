@@ -1,20 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 import { 
   Save, ArrowLeft, Globe, Lock, Users, 
   Tag, Hash, FileText, Settings,
-  Trash2, AlertCircle, Check, X,
-  Download, Upload, Import, FileJson, FileSpreadsheet // ДОБАВЛЕНО
+  Trash2, AlertCircle, Check,
+  Download, Upload,
+  Plus
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { deckAPI } from '../services/api';
 import type { Deck } from '../types';
-import ImportExportModal from '../components/ImportExportModal'; // ДОБАВЛЕНО
+import ImportExportModal from '../components/ImportExportModal';
 
 const DeckDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isNewDeck = id === 'new';
+  const toast = useToast();
+  
+  // Проверяем URL напрямую для определения режима
+  const currentPath = window.location.pathname;
+  const isCreatingFromURL = currentPath.includes('/decks/new');
+  
+  // Определяем режим: создание или редактирование
+  const isNewDeck = isCreatingFromURL || !id || id === 'new';
   
   const [deck, setDeck] = useState<Partial<Deck>>({
     name: '',
@@ -30,8 +39,8 @@ const DeckDetailPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showImportExportModal, setShowImportExportModal] = useState(false); // ДОБАВЛЕНО
-  const [deckStats, setDeckStats] = useState<{ // ДОБАВЛЕНО
+  const [showImportExportModal, setShowImportExportModal] = useState(false);
+  const [deckStats, setDeckStats] = useState<{
     total_cards: number;
     due_cards: number;
     last_studied?: string;
@@ -47,22 +56,29 @@ const DeckDetailPage = () => {
   ];
 
   useEffect(() => {
-    if (!isNewDeck && id) {
+    if (!isNewDeck && id && id !== 'new') {
       fetchDeck();
-      fetchDeckStats(); // ДОБАВЛЕНО
+      fetchDeckStats();
+    } else {
+      // Сбрасываем форму для создания новой колоды
+      setDeck({
+        name: '',
+        language: 'en',
+        description: '',
+        is_public: false,
+      });
     }
   }, [id, isNewDeck]);
 
   const fetchDeck = async () => {
-    if (!id || isNewDeck) return;
+    if (isNewDeck) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await deckAPI.getById(parseInt(id));
+      const response = await deckAPI.getById(parseInt(id!));
       setDeck(response.data);
-      // TODO: Загрузка тегов когда будет API для тегов
     } catch (err: any) {
       setError(err.message || 'Ошибка при загрузке курса');
     } finally {
@@ -70,13 +86,11 @@ const DeckDetailPage = () => {
     }
   };
 
-  // ДОБАВЛЕНО: Функция для получения статистики колоды
   const fetchDeckStats = async () => {
-    if (!id || isNewDeck) return;
+    if (isNewDeck) return;
     
     try {
-      // Временная заглушка - в реальном приложении нужно добавить API для статистики колоды
-      const response = await deckAPI.getById(parseInt(id));
+      const response = await deckAPI.getById(parseInt(id!));
       const deckData = response.data;
       
       setDeckStats({
@@ -89,44 +103,106 @@ const DeckDetailPage = () => {
     }
   };
 
-  const handleSave = async () => {
+  // Функция создания новой колоды
+  const handleCreateDeck = async () => {
     if (!deck.name?.trim()) {
-      setError('Название курса обязательно');
+      toast.warning('Введите название курса');
+      return;
       return;
     }
 
     setSaving(true);
     setError(null);
-    setSuccess(null);
     
     try {
-      if (isNewDeck) {
-        const response = await deckAPI.create(deck);
-        setSuccess('Курс успешно создан!');
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('Вы не авторизованы!');
+        window.location.href = '/login';
+        return;
+      }
+      
+      const response = await fetch('http://localhost:5000/api/decks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: deck.name.trim(),
+          language: deck.language || 'en',
+          description: deck.description?.trim() || '',
+          is_public: deck.is_public || false
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        const deckId = result.deck?.id || result.id;
+        toast.success(`Курс "${deck.name}" создан!`);
+        
         setTimeout(() => {
-          navigate(`/decks/${response.data.deck.id}`);
+          navigate(`/decks/${deckId}`);
         }, 1500);
-      } else if (id) {
-        const response = await deckAPI.update(parseInt(id), deck);
-        setSuccess('Колода успешно обновлена!');
-        setDeck(response.data.deck);
-        fetchDeckStats(); // Обновляем статистику после сохранения
-        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError(`❌ Ошибка: ${result.error || result.message}`);
       }
     } catch (err: any) {
-      setError(err.message || 'Ошибка при сохранении колоды');
+      console.error('❌ Ошибка сети:', err);
+      setError('❌ Ошибка сети или сервера');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (isNewDeck) return;
+    
+    setSaving(true);
+    setError(null);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/decks/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: deck.name?.trim(),
+          language: deck.language,
+          description: deck.description?.trim(),
+          is_public: deck.is_public
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        setSuccess(`✅ Курс "${deck.name}" обновлен!`);
+        setTimeout(() => setSuccess(null), 2000);
+        fetchDeck();
+      } else {
+        setError(`❌ Ошибка: ${result.error || result.message}`);
+      }
+    } catch (err: any) {
+      console.error('❌ Ошибка сети:', err);
+      setError('❌ Ошибка сети или сервера');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!id || isNewDeck) return;
+    if (isNewDeck) return;
     
     setSaving(true);
     
     try {
-      await deckAPI.delete(parseInt(id));
+      await deckAPI.delete(parseInt(id!));
       navigate('/decks');
     } catch (err: any) {
       setError(err.message || 'Ошибка при удалении курса');
@@ -135,10 +211,9 @@ const DeckDetailPage = () => {
     }
   };
 
-  // ДОБАВЛЕНО: Обработка успешного импорта
   const handleImportSuccess = () => {
     setSuccess('Карточки успешно импортированы!');
-    fetchDeckStats(); // Обновляем статистику после импорта
+    fetchDeckStats();
     setTimeout(() => setSuccess(null), 3000);
   };
 
@@ -153,14 +228,12 @@ const DeckDetailPage = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  // ДОБАВЛЕНО: Функция для экспорта напрямую (без модального окна)
   const handleQuickExport = async () => {
-    if (!id || isNewDeck) return;
+    if (isNewDeck) return;
     
     try {
-      const response = await deckAPI.export(parseInt(id), 'json');
+      const response = await deckAPI.export(parseInt(id!), 'json');
       
-      // Создаем и скачиваем файл
       const dataStr = JSON.stringify(response.data, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
@@ -192,16 +265,15 @@ const DeckDetailPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Заголовок и действия */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-center space-x-4">
             <Link to="/decks" className="text-gray-600 hover:text-gray-900">
               <ArrowLeft className="h-6 w-6" />
             </Link>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {isNewDeck ? 'Создание нового курса' : `Редактирование: ${deck.name}`}
+                {isNewDeck ? 'Создание нового курса' : `Редактирование: ${deck.name || 'Загрузка...'}`}
               </h1>
               <p className="text-gray-600 mt-2">
                 {isNewDeck 
@@ -214,7 +286,6 @@ const DeckDetailPage = () => {
           
           {!isNewDeck && (
             <div className="flex items-center space-x-3">
-              {/* ДОБАВЛЕНО: Кнопки быстрого доступа */}
               <button
                 onClick={handleQuickExport}
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -379,11 +450,11 @@ const DeckDetailPage = () => {
 
         {/* Настройки и действия */}
         <div className="space-y-6">
-          {/* Статистика колоды (ДОБАВЛЕНО) */}
+          {/* Статистика колоды */}
           {!isNewDeck && deckStats && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-6 flex items-center">
-                <FileSpreadsheet className="h-5 w-5 mr-2 text-blue-600" />
+                <FileText className="h-5 w-5 mr-2 text-blue-600" />
                 Статистика
               </h2>
               
@@ -415,27 +486,6 @@ const DeckDetailPage = () => {
                     <Check className="h-8 w-8 text-green-500" />
                   </div>
                 )}
-                
-                {/* ДОБАВЛЕНО: Быстрые действия */}
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setShowImportExportModal(true)}
-                      className="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <Import className="h-5 w-5 text-blue-600 mb-1" />
-                      <span className="text-sm font-medium">Импорт</span>
-                    </button>
-                    
-                    <button
-                      onClick={handleQuickExport}
-                      className="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <FileJson className="h-5 w-5 text-green-600 mb-1" />
-                      <span className="text-sm font-medium">Экспорт</span>
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -448,7 +498,8 @@ const DeckDetailPage = () => {
             </h2>
             
             <div className="space-y-6">
-              <div>
+              {/* Переключатель публичности */}
+              <div className="mb-6">
                 <label className="flex items-center justify-between cursor-pointer">
                   <div className="flex items-center">
                     {deck.is_public ? (
@@ -512,54 +563,80 @@ const DeckDetailPage = () => {
           </div>
 
           {/* Кнопки действий */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="space-y-4">
-              <button
-                onClick={handleSave}
-                disabled={saving || !deck.name?.trim()}
-                className="w-full btn-primary flex items-center justify-center py-3"
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Сохранение...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-5 w-5 mr-2" />
-                    {isNewDeck ? 'Создать курс' : 'Сохранить изменения'}
-                  </>
-                )}
-              </button>
-              
-              {!isNewDeck && (
-                <>
-                  <Link
-                    to={`/decks/${id}/cards`}
-                    className="block w-full text-center px-4 py-3 bg-primary-50 text-primary-700 rounded-lg font-medium hover:bg-primary-100 transition-colors"
-                  >
-                    Перейти к карточкам
-                  </Link>
-                  
-                  <button
-                    onClick={() => setShowImportExportModal(true)}
-                    className="w-full flex items-center justify-center px-4 py-3 border-2 border-dashed border-primary-300 text-primary-700 rounded-lg font-medium hover:bg-primary-50 transition-colors"
-                  >
-                    <Upload className="h-5 w-5 mr-2" />
-                    Импорт карточек
-                  </button>
-                  
-                  <button
-                    onClick={handleQuickExport}
-                    className="w-full flex items-center justify-center px-4 py-3 border-2 border-dashed border-green-300 text-green-700 rounded-lg font-medium hover:bg-green-50 transition-colors"
-                  >
-                    <Download className="h-5 w-5 mr-2" />
-                    Экспорт курса
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+  <h2 className="text-xl font-bold mb-6 flex items-center">
+    <Plus className="h-5 w-5 mr-2 text-primary-600" />
+    Дополнительные действия
+  </h2>
+  
+  <div className="space-y-4">
+    {/* Кнопка для создания новой колоды */}
+    {isNewDeck ? (
+      <button
+        onClick={handleCreateDeck}
+        disabled={saving || !deck.name?.trim()}
+        className="w-full py-3 px-4 rounded-lg font-bold flex items-center justify-center shadow-md transition-all bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {saving ? (
+          <>
+            <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent mr-2"></div>
+            Создание...
+          </>
+        ) : (
+          <>
+            <Plus className="h-5 w-5 mr-2" />
+            СОЗДАТЬ КУРС
+          </>
+        )}
+      </button>
+    ) : (
+      <>
+        {/* Кнопка сохранения для существующей колоды */}
+        <button
+          onClick={handleSaveChanges}
+          disabled={saving || !deck.name?.trim()}
+          className="w-full py-3 px-4 rounded-lg font-bold flex items-center justify-center shadow-md transition-all bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? (
+            <>
+              <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent mr-2"></div>
+              Сохранение...
+            </>
+          ) : (
+            <>
+              <Save className="h-5 w-5 mr-2" />
+              СОХРАНИТЬ ИЗМЕНЕНИЯ
+            </>
+          )}
+        </button>
+        
+        <Link
+          to={`/decks/${id}/cards`}
+          className="block w-full text-center px-4 py-3 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors flex items-center justify-center"
+        >
+          <FileText className="h-5 w-5 mr-2" />
+          Перейти к карточкам
+        </Link>
+        
+        <button
+          onClick={() => setShowImportExportModal(true)}
+          className="w-full flex items-center justify-center px-4 py-3 bg-indigo-50 text-indigo-700 rounded-lg font-medium hover:bg-indigo-100 transition-colors"
+        >
+          <Upload className="h-5 w-5 mr-2" />
+          Импорт карточек
+        </button>
+        
+        <button
+          onClick={handleQuickExport}
+          className="w-full flex items-center justify-center px-4 py-3 bg-green-50 text-green-700 rounded-lg font-medium hover:bg-green-100 transition-colors"
+        >
+          <Download className="h-5 w-5 mr-2" />
+          Экспорт курса
+        </button>
+      </>
+    )}
+  </div>
+</div>
         </div>
       </div>
 
@@ -607,7 +684,7 @@ const DeckDetailPage = () => {
         </div>
       )}
 
-      {/* ДОБАВЛЕНО: Модальное окно импорта/экспорта */}
+      {/* Модальное окно импорта/экспорта */}
       {!isNewDeck && id && (
         <ImportExportModal
           isOpen={showImportExportModal}

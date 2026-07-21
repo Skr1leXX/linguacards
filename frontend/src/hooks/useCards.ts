@@ -26,22 +26,38 @@ export const useCards = (deckId?: number) => {
   }, [deckId]);
 
   const createCard = useCallback(async (cardData: any) => {
-    if (!deckId) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await cardAPI.create(deckId, cardData);
-      setCards(prev => [response.data.card, ...prev]);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при создании карточки');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [deckId]);
+  if (!deckId) {
+    console.error('useCards.createCard: deckId не определен!');
+    return;
+  }
+  
+  setLoading(true);
+  setError(null);
+  
+  console.log('=== DEBUG useCards.createCard ===');
+  console.log('deckId:', deckId);
+  console.log('cardData:', cardData);
+  console.log('URL запроса:', `/cards/deck/${deckId}`);
+  
+  try {
+    const response = await cardAPI.create(deckId, cardData);
+    console.log('Ответ от сервера:', response);
+    console.log('Данные ответа:', response.data);
+    setCards(prev => [response.data.card, ...prev]);
+    return response.data;
+  } catch (err: any) {
+    console.error('Ошибка в useCards.createCard:', err);
+    console.error('Детали:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status
+    });
+    setError(err.message || 'Ошибка при создании карточки');
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+}, [deckId]);
 
   const updateCard = useCallback(async (cardId: number, cardData: any) => {
     setLoading(true);

@@ -1,0 +1,11 @@
+{
+  "testEnvironment": "node",
+  "rootDir": ".",
+  "testMatch": ["**/__tests__/**/*.test.js"],
+  "collectCoverageFrom": [
+    "src/controllers/**/*.js",
+    "src/services/**/*.js"
+  ],
+  "coverageReporters": ["text", "lcov"],
+  "verbose": true
+}

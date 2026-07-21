@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.env
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store
+collect_code.py
+full_project_code.txt

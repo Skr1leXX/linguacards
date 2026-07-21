@@ -1,4 +1,4 @@
-// api.ts - ВЕРНУТЬ СТАРЫЙ ВАРИАНТ
+// api.ts
 import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api';
@@ -10,41 +10,50 @@ const api = axios.create({
   },
 });
 
-// Интерцептор для добавления токена к запросам
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`);
+    console.log('Data:', config.data);
+    console.log('Headers:', config.headers);
     return config;
   },
   (error) => {
+    console.error('❌ Ошибка в запросе:', error);
     return Promise.reject(error);
   }
 );
 
-// Интерцептор для обработки ошибок
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(`📥 ${response.status} ${response.config.url}`);
+    console.log('Response data:', response.data);
+    return response;
+  },
   (error) => {
+    console.error(`❌ ${error.response?.status || 'No status'} ${error.config?.url}`);
+    console.error('Error response:', error.response?.data);
+    console.error('Error message:', error.message);
+
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    
-    // Улучшенная обработка ошибок
-    const errorMessage = error.response?.data?.error || 
-                       error.response?.data?.message || 
-                       error.message || 
-                       'Ошибка сервера';
-    
+
+    const errorMessage =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      'Ошибка сервера';
+
     return Promise.reject(new Error(errorMessage));
   }
 );
 
-// Типы для фильтров готовых колод
 export interface PrebuiltDeckFilters {
   category?: string;
   language?: string;
@@ -52,7 +61,6 @@ export interface PrebuiltDeckFilters {
   search?: string;
 }
 
-// Типы для ответов API готовых колод
 export interface PrebuiltDeckData {
   decks: any[];
   categories: Array<{ id: string; name: string; deck_count: number }>;
@@ -61,38 +69,34 @@ export interface PrebuiltDeckData {
   total: number;
 }
 
-// Общий тип ответа API
 export interface ApiResponse<T = any> {
   data: T;
   message?: string;
   status?: number;
 }
 
-// API функции - ВЕРНУТЬ deckAPI как было
 export const authAPI = {
-  login: (email: string, password: string) => 
+  login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
-  
-  register: (email: string, username: string, password: string) => 
+  register: (email: string, username: string, password: string) =>
     api.post('/auth/register', { email, username, password }),
-  
   getProfile: () => api.get('/auth/profile'),
 };
 
 export const userAPI = {
   getProfile: () => api.get('/users/me'),
   updateProfile: (data: any) => api.put('/users/profile', data),
-  changePassword: (currentPassword: string, newPassword: string) => 
+  changePassword: (currentPassword: string, newPassword: string) =>
     api.put('/users/change-password', { currentPassword, newPassword }),
 };
 
-export const deckAPI = {  // ← ВЕРНУЛИ deckAPI
+export const deckAPI = {
   getAll: () => api.get('/decks'),
   getById: (id: number) => api.get(`/decks/${id}`),
   create: (data: any) => api.post('/decks', data),
   update: (id: number, data: any) => api.put(`/decks/${id}`, data),
   delete: (id: number) => api.delete(`/decks/${id}`),
-  export: (id: number, format: string = 'json') => 
+  export: (id: number, format: string = 'json') =>
     api.get(`/decks/${id}/export`, { params: { format } }),
 };
 
@@ -105,29 +109,46 @@ export const cardAPI = {
   review: (id: number, result: boolean) => api.post(`/cards/${id}/review`, { result }),
 };
 
+export const statsAPI = {
+  getOverview: () => api.get('/stats/overview'),
+  getDailyStats: (days: number = 7) =>
+    api.get('/stats/daily', { params: { days } }),
+  getLanguageStats: () => api.get('/stats/languages'),
+  getDeckStats: (deckId: number) => api.get(`/stats/deck/${deckId}`),
+  // ── Heatmap — активность за 365 дней ──────────────────────────────────────
+  getHeatmap: () => api.get('/stats/heatmap'),
+};
+
 export const studyAPI = {
-  getSessionCards: (deckId?: number, limit?: number) => 
+  getSessionCards: (deckId?: number, limit?: number) =>
     api.get('/study/session', { params: { deckId, limit } }),
-  
-  getStats: (period?: string) => 
-    api.get('/study/stats', { params: { period } }),
-  
-  importCards: (deckId: number, cards: any[], format: string = 'json') => 
+
+  getStats: (period?: string) => {
+    switch (period) {
+      case 'day':    return statsAPI.getDailyStats(1);
+      case 'week':   return statsAPI.getDailyStats(7);
+      case 'month':  return statsAPI.getDailyStats(30);
+      case 'languages': return statsAPI.getLanguageStats();
+      default:       return statsAPI.getOverview();
+    }
+  },
+
+  importCards: (deckId: number, cards: any[], format: string = 'json') =>
     api.post(`/study/import/${deckId}`, { cards, format }),
-  
-  exportCards: (deckId: number, format: string = 'json') => 
-    api.get(`/study/export/${deckId}`, { 
+
+  exportCards: (deckId: number, format: string = 'json') =>
+    api.get(`/study/export/${deckId}`, {
       params: { format },
-      responseType: format === 'csv' ? 'blob' : 'json'
+      responseType: format === 'csv' ? 'blob' : 'json',
     }),
-  
-  getPrebuiltDecks: (filters?: PrebuiltDeckFilters) => 
+
+  getPrebuiltDecks: (filters?: PrebuiltDeckFilters) =>
     api.get<ApiResponse<PrebuiltDeckData>>('/study/prebuilt-decks', { params: filters }),
-  
-  getPrebuiltDeckCards: (deckId: number) => 
+
+  getPrebuiltDeckCards: (deckId: number) =>
     api.get(`/study/prebuilt-decks/${deckId}/cards`),
-  
-  addPrebuiltDeck: (deckId: number, data?: { custom_name?: string }) => 
+
+  addPrebuiltDeck: (deckId: number, data?: { custom_name?: string }) =>
     api.post(`/study/prebuilt-decks/${deckId}/add`, data),
 };
 

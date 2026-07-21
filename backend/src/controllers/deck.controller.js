@@ -4,9 +4,9 @@ const getAllDecks = async (req, res) => {
   try {
     const decks = await new Promise((resolve, reject) => {
       db.all(
-        `SELECT d.*, 
+        `SELECT d.id, d.user_id, d.name, d.language, d.description, d.created_at,
                 COUNT(c.id) as card_count,
-                SUM(CASE WHEN c.next_review_date <= datetime('now') THEN 1 ELSE 0 END) as due_count
+                SUM(CASE WHEN c.next_review_date <= datetime('now') OR c.next_review_date IS NULL THEN 1 ELSE 0 END) as due_count
          FROM decks d
          LEFT JOIN cards c ON d.id = c.deck_id
          WHERE d.user_id = ?
@@ -33,9 +33,9 @@ const getDeckById = async (req, res) => {
     
     const deck = await new Promise((resolve, reject) => {
       db.get(
-        `SELECT d.*, 
+        `SELECT d.id, d.user_id, d.name, d.language, d.description, d.created_at,
                 COUNT(c.id) as card_count,
-                SUM(CASE WHEN c.next_review_date <= datetime('now') THEN 1 ELSE 0 END) as due_count
+                SUM(CASE WHEN c.next_review_date <= datetime('now') OR c.next_review_date IS NULL THEN 1 ELSE 0 END) as due_count
          FROM decks d
          LEFT JOIN cards c ON d.id = c.deck_id
          WHERE d.id = ? AND d.user_id = ?
@@ -61,7 +61,11 @@ const getDeckById = async (req, res) => {
 
 const createDeck = async (req, res) => {
   try {
-    const { name, language, description, is_public = false } = req.body;
+    console.log('=== CREATE DECK - NO is_public ===');
+    console.log('User ID:', req.userId);
+    console.log('Body:', req.body);
+    
+    const { name, language, description } = req.body; // ← УБРАЛ is_public
     
     if (!name || !language) {
       return res.status(400).json({ error: 'Название и язык обязательны' });
@@ -69,16 +73,21 @@ const createDeck = async (req, res) => {
 
     const result = await new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO decks (user_id, name, language, description, is_public) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [req.userId, name, language, description || null, is_public ? 1 : 0],
+        `INSERT INTO decks (user_id, name, language, description, created_at) 
+         VALUES (?, ?, ?, ?, datetime('now'))`, // ← УБРАЛ is_public из INSERT
+        [req.userId, name, language, description || null], // ← УБРАЛ is_public значение
         function(err) {
-          if (err) reject(err);
-          resolve(this);
+          if (err) {
+            console.error('❌ Database error:', err.message);
+            reject(err);
+          } else {
+            console.log('✅ Insert successful, ID:', this.lastID);
+            resolve(this);
+          }
         }
       );
     });
-
+    
     const deck = await new Promise((resolve, reject) => {
       db.get(
         'SELECT * FROM decks WHERE id = ?',
@@ -89,21 +98,27 @@ const createDeck = async (req, res) => {
         }
       );
     });
-
+    
+    console.log('Created deck:', deck);
+    
     res.status(201).json({
       message: 'Колода успешно создана',
       deck
     });
+    
   } catch (error) {
     console.error('Ошибка при создании колоды:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    res.status(500).json({ 
+      error: 'Ошибка сервера при создании колоды',
+      details: error.message 
+    });
   }
 };
 
 const updateDeck = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, language, description, is_public } = req.body;
+    const { name, language, description } = req.body; 
     
     // Проверяем, существует ли колода и принадлежит ли пользователю
     const existingDeck = await new Promise((resolve, reject) => {
@@ -138,11 +153,6 @@ const updateDeck = async (req, res) => {
     if (description !== undefined) {
       updates.push('description = ?');
       params.push(description);
-    }
-    
-    if (is_public !== undefined) {
-      updates.push('is_public = ?');
-      params.push(is_public ? 1 : 0);
     }
     
     if (updates.length === 0) {
