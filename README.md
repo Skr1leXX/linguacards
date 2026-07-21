@@ -1,4 +1,4 @@
-<img width="1920" height="1038" alt="ima1ge" src="https://github.com/user-attachments/assets/4552bdfd-6265-456a-88ff-e5d742e0f3a2" /># 🎴 LinguaCards
+# 🎴 LinguaCards
 
 Веб-приложение для изучения иностранных языков методом карточек с адаптивным алгоритмом интервального повторения.
 
