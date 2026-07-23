@@ -1,7 +1,10 @@
-// api.ts
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : 'http://localhost:5000/api';
+
+const isDev = import.meta.env.DEV;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -16,27 +19,33 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`);
-    console.log('Data:', config.data);
-    console.log('Headers:', config.headers);
+    if (isDev) {
+      console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`);
+      console.log('Data:', config.data);
+      console.log('Headers:', config.headers);
+    }
     return config;
   },
   (error) => {
-    console.error('❌ Ошибка в запросе:', error);
+    if (isDev) console.error('❌ Ошибка в запросе:', error);
     return Promise.reject(error);
   }
 );
 
 api.interceptors.response.use(
   (response) => {
-    console.log(`📥 ${response.status} ${response.config.url}`);
-    console.log('Response data:', response.data);
+    if (isDev) {
+      console.log(`📥 ${response.status} ${response.config.url}`);
+      console.log('Response data:', response.data);
+    }
     return response;
   },
   (error) => {
-    console.error(`❌ ${error.response?.status || 'No status'} ${error.config?.url}`);
-    console.error('Error response:', error.response?.data);
-    console.error('Error message:', error.message);
+    if (isDev) {
+      console.error(`❌ ${error.response?.status || 'No status'} ${error.config?.url}`);
+      console.error('Error response:', error.response?.data);
+      console.error('Error message:', error.message);
+    }
 
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
