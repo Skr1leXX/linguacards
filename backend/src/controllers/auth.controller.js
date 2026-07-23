@@ -1,30 +1,18 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const db = require('../config/database');
 
-// ─── Email transporter ────────────────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: Number(process.env.EMAIL_PORT) || 587,
-  secure: Number(process.env.EMAIL_PORT) === 465,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  family: 4,
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-});
+// ─── Email client (Resend) ────────────────────────────────────────────────────
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const generateCode = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const sendVerificationEmail = async (email, code) => {
-  await transporter.sendMail({
-    from: `"Spaced Repetition" <${process.env.EMAIL_FROM}>`,
+  await resend.emails.send({
+    from: process.env.EMAIL_FROM,
     to: email,
     subject: 'Код подтверждения регистрации',
     html: `
@@ -258,8 +246,8 @@ const forgotPassword = async (req, res) => {
 
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
 
-    await transporter.sendMail({
-      from: `"Spaced Repetition" <${process.env.EMAIL_FROM}>`,
+    await resend.emails.send({
+      from: process.env.EMAIL_FROM,
       to: email,
       subject: 'Сброс пароля',
       html: `
